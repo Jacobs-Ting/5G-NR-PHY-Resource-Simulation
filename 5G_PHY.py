@@ -317,18 +317,25 @@ def plot_grid(g, ax, base_f, title, ylabel):
     ax.set_title(title); ax.set_ylabel(ylabel); ax.set_xlabel("Time (ms)")
 
 if duplex_mode == "TDD":
-    fig, ax = plt.subplots(figsize=(12, 5)); plot_grid(grid_tdd, ax, fc_dl_mhz-carrier_bw_mhz/2, f"TDD | Band {user_band.upper()} | {test_ch} Channel", "Freq (MHz)")
+    fig, ax = plt.subplots(figsize=(12, 5))
+    plot_grid(grid_tdd, ax, fc_dl_mhz-carrier_bw_mhz/2, f"TDD | Band {user_band.upper()} | {test_ch} Channel", "Freq (MHz)")
+    ax.legend(handles=legend, loc='center left', bbox_to_anchor=(1.02, 0.5))
     st.pyplot(fig)
 elif duplex_mode == "SDL":
-    fig, ax = plt.subplots(figsize=(12, 5)); plot_grid(grid_dl, ax, fc_dl_mhz-carrier_bw_mhz/2, f"SDL | Band {user_band.upper()}", "DL Freq (MHz)")
+    fig, ax = plt.subplots(figsize=(12, 5))
+    plot_grid(grid_dl, ax, fc_dl_mhz-carrier_bw_mhz/2, f"SDL | Band {user_band.upper()}", "DL Freq (MHz)")
+    ax.legend(handles=legend, loc='center left', bbox_to_anchor=(1.02, 0.5))
     st.pyplot(fig)
 elif duplex_mode == "SUL":
-    fig, ax = plt.subplots(figsize=(12, 5)); plot_grid(grid_ul, ax, fc_ul_mhz-carrier_bw_mhz/2, f"SUL | Band {user_band.upper()}", "UL Freq (MHz)")
+    fig, ax = plt.subplots(figsize=(12, 5))
+    plot_grid(grid_ul, ax, fc_ul_mhz-carrier_bw_mhz/2, f"SUL | Band {user_band.upper()}", "UL Freq (MHz)")
+    ax.legend(handles=legend, loc='center left', bbox_to_anchor=(1.02, 0.5))
     st.pyplot(fig)
 else:
     fig, (ax_d, ax_u) = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
     plot_grid(grid_dl, ax_d, fc_dl_mhz-carrier_bw_mhz/2, f"DL | Band {user_band.upper()}", "DL Freq (MHz)")
     plot_grid(grid_ul, ax_u, fc_ul_mhz-carrier_bw_mhz/2, f"UL | Spacing: {spacing_mhz}MHz", "UL Freq (MHz)")
+    fig.legend(handles=legend, loc='center right', bbox_to_anchor=(1.12, 0.5))
     st.pyplot(fig)
 
 st.success(f"🚀 **Throughput Estimates**: DL: **{dl_mbps:.2f} Mbps** | UL: **{ul_mbps:.2f} Mbps**")
