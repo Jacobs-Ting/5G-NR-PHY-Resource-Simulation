@@ -5,19 +5,47 @@ import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import matplotlib.patches as patches
 
-# --- 1. Page Configuration ---
-st.set_page_config(page_title="5G NR Pro Scheduler (English Ultimate)", layout="wide")
-st.title("📡 5G NR Resource Grid Simulator (Multi-Domain Ultimate)")
-st.markdown("Global Edition: Integrated TS 38.521-1 (FR1), -2 (FR2 mmWave), and -5 (NTN) with dynamic ARFCN derivation.")
+# --- 1. Page Configuration & Cyberpunk CSS ---
+st.set_page_config(page_title="5G NR Pro Scheduler (HUD Edition)", layout="wide", initial_sidebar_state="expanded")
+
+# 注入科技感 CSS (發光邊框、終端機字體)
+st.markdown("""
+<style>
+    h1, h2, h3 {
+        color: #00e5ff !important;
+        font-family: 'Courier New', monospace !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    /* 儀表板卡片科技感設計 */
+    [data-testid="metric-container"] {
+        background-color: #0b101a;
+        border: 1px solid #00e5ff;
+        box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+        padding: 15px;
+        border-radius: 4px;
+        border-left: 5px solid #00e5ff;
+    }
+    [data-testid="stMetricValue"] {
+        color: #39ff14 !important;
+        font-family: 'Courier New', monospace !important;
+    }
+    .stAlert {
+        border-left-color: #ff007f !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.title("📡 5G NR Tactical Scheduler [HUD.v1]")
+st.markdown("Advanced L1/MAC Resource Allocation Console | **Status: ONLINE**")
 
 # --- 1.5 3GPP Reference Expander ---
-with st.expander("📚 3GPP Specifications & Standards Reference (Release 18)", expanded=False):
+with st.expander("📚 SYSTEM ARCHITECTURE & 3GPP COMPLIANCE (REL-18)", expanded=False):
     st.markdown("""
-    The physical layer constraints and calculations are strictly aligned with **3GPP Release 18 (5G-Advanced)**:
-    * **TS 38.211**: Resource grid structure, Logical Antenna Ports (0, 1000, 2000, 4000), and DFT-s-OFDM rules.
-    * **TS 38.101-1 / -2 / -5**: N_RB tables, Global Frequency Raster, and SDL/SUL spectrum characteristics.
-    * **TS 38.521-1 / -2 / -5**: Band boundaries, Default NR-ARFCNs derivation, and Inner/Outer Full allocations.
-    * **TS 38.306**: Theoretical Maximum Throughput calculation model.
+    * **TS 38.211**: Resource grid structure, Logical Antenna Ports, CORESET, DFT-s-OFDM.
+    * **TS 38.101-1 / -2 / -5**: N_RB tables, Global Frequency Raster, SDL/SUL characteristics.
+    * **TS 38.521-1 / -2 / -5**: Band boundaries, NR-ARFCNs derivation, Inner/Outer Full allocations.
+    * **TS 38.306**: Theoretical Maximum Throughput calculation.
     """)
 
 # --- 2. 3GPP Data Repositories ---
@@ -31,7 +59,6 @@ TS_38101_N_RB_FR2 = {
     50: {60: 66, 120: 32}, 100: {60: 132, 120: 66}, 200: {60: 264, 120: 132}, 400: {120: 264}
 }
 
-# Full FR1 Database
 band_db_fr1 = {
     "n1": {"mode": "FDD", "dl_min": 2110.0, "dl_max": 2170.0, "ul_min": 1920.0, "ul_max": 1980.0},
     "n2": {"mode": "FDD", "dl_min": 1930.0, "dl_max": 1990.0, "ul_min": 1850.0, "ul_max": 1910.0},
@@ -80,10 +107,9 @@ def arfcn_to_freq_mhz(arfcn):
     elif arfcn <= 2016666: return 3000.0 + (arfcn - 600000) * 0.015
     else: return 24250.08 + (arfcn - 2016667) * 0.06
 
-# --- 3. Sidebar UI (English) ---
-st.sidebar.header("0. 3GPP Test Domain")
-domain_selection = st.sidebar.radio("Domain Selection", 
-                                    ["TS 38.521-1 (FR1)", "TS 38.521-2 (FR2)", "TS 38.521-5 (NTN)"])
+# --- 3. Sidebar Configuration Console ---
+st.sidebar.header("0. RF DOMAIN")
+domain_selection = st.sidebar.radio("Select Active Domain", ["TS 38.521-1 (FR1)", "TS 38.521-2 (FR2)", "TS 38.521-5 (NTN)"])
 
 if "FR2" in domain_selection:
     active_band_db, active_n_rb_table, def_band = band_db_fr2, TS_38101_N_RB_FR2, "n257"
@@ -93,19 +119,16 @@ else:
     active_band_db, active_n_rb_table, def_band = band_db_fr1, TS_38101_N_RB_FR1, "n78"
 
 st.sidebar.markdown("---")
-st.sidebar.header("1. RF Band & Boundaries")
-user_band = st.sidebar.text_input("Band (e.g. n12, n39, n78)", value=def_band).strip().lower()
+st.sidebar.header("1. CARRIER SPECS")
+user_band = st.sidebar.text_input("Operating Band", value=def_band).strip().lower()
 
 if user_band in active_band_db:
     b_info = active_band_db[user_band]
     duplex_mode = b_info["mode"]
     dl_min, dl_max, ul_min, ul_max = float(b_info["dl_min"]), float(b_info["dl_max"]), float(b_info["ul_min"]), float(b_info["ul_max"])
-    st.sidebar.success(f"✅ Band {user_band.upper()} ({duplex_mode}) Identified")
-    
     if duplex_mode == "SDL":
-        st.sidebar.info("🔗 SDL detected. Sensitivity testing requires ENDC/CA Anchor for UL.")
+        st.sidebar.warning("🚨 SDL Detected: Ext. Anchor required for UL.")
 else:
-    st.sidebar.warning("⚠️ Unknown Band. Manual Entry Enabled.")
     duplex_mode = st.sidebar.radio("Duplex", ["TDD", "FDD", "SDL", "SUL"])
     base_f = 28000.0 if "FR2" in domain_selection else 3300.0
     dl_min = st.sidebar.number_input("DL Min (MHz)", value=base_f) if duplex_mode != "SUL" else 0.0
@@ -116,33 +139,31 @@ else:
 spacing_mhz = ul_min - dl_min if duplex_mode not in ["SDL", "SUL"] else 0
 
 if "TDD" in duplex_mode:
-    tdd_pattern = st.sidebar.text_input("TDD Pattern", value="D,D,U,U")
+    tdd_pattern = st.sidebar.text_input("TDD Slots", value="D,D,U,U")
     slots = [s.strip().upper() for s in tdd_pattern.split(',')]
     n_slots = len(slots)
     dl_syms, ul_syms = slots.count('D') * 14, slots.count('U') * 14
 else:
-    n_slots = st.sidebar.number_input("Total Slots", min_value=1, max_value=20, value=4)
+    n_slots = st.sidebar.number_input("Sim Slots", min_value=1, max_value=20, value=4)
     slots = []
     dl_syms = n_slots * 14 if duplex_mode != "SUL" else 0
     ul_syms = n_slots * 14 if duplex_mode != "SDL" else 0
 n_symbols = n_slots * 14
 total_symbols_in_pattern = n_symbols if n_symbols > 0 else 1
 
-st.sidebar.markdown("---")
-st.sidebar.header("2. ARFCN Derivation")
 calc_min, calc_max = (ul_min, ul_max) if duplex_mode == "SUL" else (dl_min, dl_max)
 valid_bws = [bw for bw in active_n_rb_table.keys() if bw <= (calc_max - calc_min)]
 if not valid_bws: 
-    st.sidebar.error("❌ Physical width too narrow!")
+    st.sidebar.error("❌ Invalid physical width!")
     st.stop()
-selected_bw = st.sidebar.selectbox("Channel BW (MHz)", valid_bws, index=len(valid_bws)-1)
 
+selected_bw = st.sidebar.selectbox("Bandwidth (MHz)", valid_bws, index=len(valid_bws)-1)
 test_ch = st.sidebar.radio("Test Channel", ["Low", "Mid", "High", "Custom"], index=1)
 f_l, f_h = calc_min + selected_bw/2.0, calc_max - selected_bw/2.0
 if test_ch == "Low": t_fc = f_l
 elif test_ch == "High": t_fc = f_h
 elif test_ch == "Mid": t_fc = (f_l + f_h)/2.0
-else: t_fc = st.sidebar.number_input("Center Frequency (MHz)", value=float((f_l+f_h)/2.0))
+else: t_fc = st.sidebar.number_input("Custom FC (MHz)", value=float((f_l+f_h)/2.0))
 
 t_arfcn = freq_to_arfcn(t_fc)
 t_fc_mhz = arfcn_to_freq_mhz(t_arfcn)
@@ -150,13 +171,11 @@ if duplex_mode == "SDL": fc_dl_mhz, fc_ul_mhz, dl_arfcn = t_fc_mhz, 0.0, t_arfcn
 elif duplex_mode == "SUL": fc_dl_mhz, fc_ul_mhz, ul_arfcn = 0.0, t_fc_mhz, t_arfcn
 else: fc_dl_mhz, fc_ul_mhz, dl_arfcn = t_fc_mhz, t_fc_mhz + spacing_mhz, t_arfcn
 
-st.sidebar.info(f"Target: {t_fc_mhz:.3f} MHz (ARFCN {t_arfcn})")
-
 st.sidebar.markdown("---")
-st.sidebar.header("3. SCS & Allocation")
+st.sidebar.header("2. PHYSICAL ALLOCATION")
 selected_scs = st.sidebar.selectbox("SCS (kHz)", list(active_n_rb_table[selected_bw].keys()))
 max_n_rb = active_n_rb_table[selected_bw][selected_scs]
-conf_rbs = st.sidebar.number_input(f"Configured RB (Max {max_n_rb})", min_value=1, max_value=max_n_rb, value=max_n_rb)
+conf_rbs = st.sidebar.number_input(f"PRBs Configured (Max {max_n_rb})", min_value=1, max_value=max_n_rb, value=max_n_rb)
 
 if 'bwp_start' not in st.session_state: st.session_state.bwp_start = 0
 if 'bwp_len' not in st.session_state: st.session_state.bwp_len = conf_rbs
@@ -168,97 +187,70 @@ def set_alloc(mode, total):
     elif mode == "I1": st.session_state.bwp_start, st.session_state.bwp_len = 1, 1
 
 c1, c2 = st.sidebar.columns(2)
-c1.button("🟦 Outer Full", on_click=set_alloc, args=("OF", conf_rbs), use_container_width=True)
-c2.button("🟩 Inner Full", on_click=set_alloc, args=("IF", conf_rbs), use_container_width=True)
+c1.button("Outer Full", on_click=set_alloc, args=("OF", conf_rbs), use_container_width=True)
+c2.button("Inner Full", on_click=set_alloc, args=("IF", conf_rbs), use_container_width=True)
 c3, c4 = st.sidebar.columns(2)
-c3.button("⏬ Edge 1RB", on_click=set_alloc, args=("E1", conf_rbs), use_container_width=True)
-c4.button("↘️ Inner 1RB", on_click=set_alloc, args=("I1", conf_rbs), use_container_width=True)
+c3.button("Edge 1RB", on_click=set_alloc, args=("E1", conf_rbs), use_container_width=True)
+c4.button("Inner 1RB", on_click=set_alloc, args=("I1", conf_rbs), use_container_width=True)
 
-bwp_s = st.sidebar.number_input("BWP Start RB", min_value=0, max_value=conf_rbs-1, key='bwp_start')
-bwp_l = st.sidebar.number_input("BWP Length RB", min_value=1, max_value=conf_rbs-bwp_s, key='bwp_len')
+bwp_s = st.sidebar.number_input("BWP Start Index", min_value=0, max_value=conf_rbs-1, key='bwp_start')
+bwp_l = st.sidebar.number_input("Active BWP Size", min_value=1, max_value=conf_rbs-bwp_s, key='bwp_len')
 
 # --- 4. CORESET & Scheduler ---
-st.sidebar.markdown("---")
-st.sidebar.header("4. CORESET & Waveform")
 max_core = (bwp_l // 6) * 6
-if max_core < 6 or duplex_mode == "SUL":
-    core_d, core_l, core_s = 0, 0, 0
-else:
-    core_d = st.sidebar.slider("CORESET Symbols", 1, 3, 2)
-    core_l = st.sidebar.number_input("CORESET RB (mult-6)", min_value=6, max_value=max_core, step=6, value=min(24, max_core))
-    core_s = st.sidebar.number_input("CORESET Start RB", min_value=0, max_value=max(0, bwp_l-core_l), value=0)
+core_d = st.sidebar.slider("CORESET Symbols", 1, 3, 2) if max_core >= 6 and duplex_mode != "SUL" else 0
+core_l = st.sidebar.number_input("CORESET RBs", min_value=6, max_value=max_core, step=6, value=min(24, max_core)) if max_core >= 6 and duplex_mode != "SUL" else 0
+core_s = st.sidebar.number_input("CORESET Offset", min_value=0, max_value=max(0, bwp_l-core_l), value=0) if max_core >= 6 and duplex_mode != "SUL" else 0
 
 ul_waveform = st.sidebar.radio("Uplink Waveform", ["CP-OFDM", "DFT-s-OFDM"])
 pucch_edge_rbs = max(1, int(bwp_l * 0.05))
 pusch_rb_len = max(0, bwp_l - 2 * pucch_edge_rbs)
 
-if "DFT-s-OFDM" in ul_waveform and pusch_rb_len > 0:
-    n = pusch_rb_len
-    for p in [2, 3, 5]:
-        while n % p == 0: n //= p
-    if n != 1: st.sidebar.error(f"❌ PUSCH ({pusch_rb_len} RB) violates $2^\\alpha \\cdot 3^\\beta \\cdot 5^\\gamma$ rule.")
-
 # --- 5. Antenna Port Filters & Signals ---
 st.sidebar.markdown("---")
-st.sidebar.header("5. L1 Signals & Ports")
-enable_dmrs = st.sidebar.checkbox("✅ DMRS", value=True)
-enable_ptrs = st.sidebar.checkbox("✅ PTRS", value=True)
-enable_ssb = st.sidebar.checkbox("✅ SSB", value=True)
-enable_prach = st.sidebar.checkbox("✅ PRACH", value=True)
-
-port_filter = st.sidebar.selectbox("Antenna Port View", [
-    "Composite View", 
-    "[DL] Port 1000 (PDSCH/DMRS)", 
-    "[DL] Port 2000 (PDCCH)", 
-    "[UL] Port 0 (PUSCH/DMRS)", 
-    "[UL] Port 2000 (PUCCH)", 
-    "[DL] Port 4000 (SSB)", 
-    "[UL] Port 4000 (PRACH)"
+st.sidebar.header("3. LOGICAL PORTS")
+port_filter = st.sidebar.selectbox("Signal Overlay", [
+    "COMPOSITE (ALL)", "[DL] Port 1000", "[DL] Port 2000", 
+    "[UL] Port 0", "[UL] Port 2000", "[DL] Port 4000 (SSB)", "[UL] Port 4000 (PRACH)"
 ])
 
 # --- 6. TS 38.306 Throughput Configuration ---
 st.sidebar.markdown("---")
-st.sidebar.header("6. TS 38.306 Throughput")
-mimo_layers_dl = st.sidebar.selectbox("DL MIMO Layers", [1, 2, 4, 8], index=2)
-mimo_layers_ul = 1 if "DFT-s-OFDM" in ul_waveform else st.sidebar.selectbox("UL MIMO Layers", [1, 2, 4], index=1)
+st.sidebar.header("4. MAC LAYER MODULATION")
+c5, c6 = st.sidebar.columns(2)
+mimo_layers_dl = c5.selectbox("DL MIMO", [1, 2, 4, 8], index=2)
+mimo_layers_ul = c6.selectbox("UL MIMO", [1, 2, 4], index=1) if "CP-OFDM" in ul_waveform else 1
 mod_dict = {"QPSK": 2, "16QAM": 4, "64QAM": 6, "256QAM": 8}
-mod_dl_str = st.sidebar.selectbox("DL Modulation", list(mod_dict.keys()), index=3)
-mod_ul_str = st.sidebar.selectbox("UL Modulation", list(mod_dict.keys()), index=2)
+mod_dl_str = c5.selectbox("DL Mod", list(mod_dict.keys()), index=3)
+mod_ul_str = c6.selectbox("UL Mod", list(mod_dict.keys()), index=2)
 
 # --- Grid Generation ---
 n_sc = conf_rbs * 12
 grid_tdd, grid_dl, grid_ul = np.zeros((n_sc, n_symbols)), np.zeros((n_sc, n_symbols)), np.zeros((n_sc, n_symbols))
-PDCCH, PDSCH, CSI_RS, PUCCH, PUSCH, SRS = 1, 2, 3, 4, 5, 6
-DMRS_DL, PTRS_DL, PRACH = 7, 8, 9
-DMRS_UL, PTRS_UL, SSB = 10, 11, 12
+PDCCH, PDSCH, CSI_RS, PUCCH, PUSCH, DMRS_DL, PTRS_DL, DMRS_UL, PTRS_UL, SSB, PRACH = 1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 9
 
 def fill_dl(g, s):
     g[bwp_s*12:(bwp_s+bwp_l)*12, s:s+14] = PDSCH
-    if core_l > 0 and core_d > 0:
-        g[(bwp_s+core_s)*12:(bwp_s+core_s+core_l)*12, s:s+core_d] = PDCCH
-    g[bwp_s*12:(bwp_s+bwp_l)*12:4, s+6] = CSI_RS
-    if enable_dmrs: g[bwp_s*12:(bwp_s+bwp_l)*12:2, s+(3 if core_d==3 else 2)] = DMRS_DL
-    if enable_ptrs: g[bwp_s*12:(bwp_s+bwp_l)*12:48, s+4:s+13:4] = PTRS_DL
-    if enable_ssb:
-        center = bwp_s + bwp_l//2
-        ssb_start = max(0, (center-10)*12)
-        ssb_end = min(ssb_start+240, n_sc)
-        if ssb_end > ssb_start: g[ssb_start:ssb_end, s+2:s+6] = SSB
+    if core_l > 0 and core_d > 0: g[(bwp_s+core_s)*12:(bwp_s+core_s+core_l)*12, s:s+core_d] = PDCCH
+    g[bwp_s*12:(bwp_s+bwp_l)*12:2, s+(3 if core_d==3 else 2)] = DMRS_DL
+    g[bwp_s*12:(bwp_s+bwp_l)*12:48, s+4:s+13:4] = PTRS_DL
+    center = bwp_s + bwp_l//2
+    ssb_start = max(0, (center-10)*12)
+    ssb_end = min(ssb_start+240, n_sc)
+    if ssb_end > ssb_start: g[ssb_start:ssb_end, s+2:s+6] = SSB
 
 def fill_ul(g, s):
     pe = pucch_edge_rbs * 12
     if pusch_rb_len > 0:
         g[bwp_s*12+pe:(bwp_s+bwp_l)*12-pe, s:s+13] = PUSCH
-        if enable_dmrs: g[bwp_s*12+pe:(bwp_s+bwp_l)*12-pe:2, s] = DMRS_UL
-        if enable_ptrs: g[bwp_s*12+pe:(bwp_s+bwp_l)*12-pe:48, s+2:s+12:4] = PTRS_UL
-    if enable_prach:
-        center = bwp_s + bwp_l//2
-        pr_start = max(0, (center-3)*12)
-        pr_end = min(pr_start+72, n_sc)
-        if pr_end > pr_start: g[pr_start:pr_end, s+2:s+12] = PRACH
+        g[bwp_s*12+pe:(bwp_s+bwp_l)*12-pe:2, s] = DMRS_UL
+        g[bwp_s*12+pe:(bwp_s+bwp_l)*12-pe:48, s+2:s+12:4] = PTRS_UL
+    center = bwp_s + bwp_l//2
+    pr_start = max(0, (center-3)*12)
+    pr_end = min(pr_start+72, n_sc)
+    if pr_end > pr_start: g[pr_start:pr_end, s+2:s+12] = PRACH
     g[bwp_s*12:bwp_s*12+pe, s:s+13] = PUCCH
     g[(bwp_s+bwp_l)*12-pe:(bwp_s+bwp_l)*12, s:s+13] = PUCCH
-    g[bwp_s*12:(bwp_s+bwp_l)*12:2, s+13] = SRS
 
 if duplex_mode == "TDD":
     for idx, t in enumerate(slots):
@@ -268,13 +260,12 @@ elif duplex_mode == "SDL":
     for idx in range(n_slots): fill_dl(grid_dl, idx*14)
 elif duplex_mode == "SUL":
     for idx in range(n_slots): fill_ul(grid_ul, idx*14)
-else: # FDD
+else:
     for idx in range(n_slots): fill_dl(grid_dl, idx*14); fill_ul(grid_ul, idx*14)
 
-# Apply Antenna Port Filter Logic
 def apply_port_filter(g):
     f = g.copy()
-    if "Composite" in port_filter: return f
+    if "COMPOSITE" in port_filter: return f
     if "[DL] Port 1000" in port_filter: f[~np.isin(f, [PDSCH, DMRS_DL, PTRS_DL])] = 0
     elif "[DL] Port 2000" in port_filter: f[~np.isin(f, [PDCCH])] = 0
     elif "[UL] Port 0" in port_filter: f[~np.isin(f, [PUSCH, DMRS_UL, PTRS_UL])] = 0
@@ -283,11 +274,9 @@ def apply_port_filter(g):
     elif "[UL] Port 4000" in port_filter: f[~np.isin(f, [PRACH])] = 0
     return f
 
-grid_tdd = apply_port_filter(grid_tdd)
-grid_dl = apply_port_filter(grid_dl)
-grid_ul = apply_port_filter(grid_ul)
+grid_tdd, grid_dl, grid_ul = apply_port_filter(grid_tdd), apply_port_filter(grid_dl), apply_port_filter(grid_ul)
 
-# --- Throughput Calculation (Dynamic Math Engine) ---
+# --- Throughput Calculation ---
 mu = {15: 0, 30: 1, 60: 2, 120: 3}[selected_scs]
 t_s_mu = (10**-3) / (14 * (2**mu))
 def calc_tput(layers, qm, overhead, rb_len, sym_count):
@@ -297,45 +286,92 @@ def calc_tput(layers, qm, overhead, rb_len, sym_count):
 dl_mbps = calc_tput(mimo_layers_dl, mod_dict[mod_dl_str], 0.14, bwp_l, dl_syms)
 ul_mbps = calc_tput(mimo_layers_ul, mod_dict[mod_ul_str], 0.08, pusch_rb_len, ul_syms)
 
-# --- Visualization ---
+# --- Live Telemetry Dashboard ---
+st.markdown("### 📡 LIVE TELEMETRY FEED")
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("DL Throughput", f"{dl_mbps:.1f} Mbps")
+m2.metric("UL Throughput", f"{ul_mbps:.1f} Mbps")
+m3.metric("Target ARFCN", f"{t_arfcn}")
+m4.metric("Resource Util", f"{bwp_l} / {conf_rbs} PRB")
+st.markdown("---")
+
+# --- Tactical Visualization (Cyberpunk Theme) ---
+plt.style.use('dark_background') # 啟動 Matplotlib 黑暗模式
 total_ms = n_slots * (1.0 / (2**mu))
 carrier_bw_mhz = n_sc * (selected_scs / 1000.0)
-colors = ['#F0F2F6', '#336699', '#99CCFF', '#FFCC00', '#339933', '#99FF99', '#FF6699', '#00FFFF', '#FF00FF', '#FF4500', '#00FFFF', '#FF00FF', '#FFB6C1']
-cmap = mcolors.ListedColormap(colors); norm = mcolors.BoundaryNorm(np.arange(-0.5, 13.5, 1), cmap.N)
 
-legend = [mpatches.Patch(color='#336699', label='PDCCH'), mpatches.Patch(color='#99CCFF', label='PDSCH'),
-          mpatches.Patch(color='#FFB6C1', label='SSB'), mpatches.Patch(color='#339933', label='PUCCH'), 
-          mpatches.Patch(color='#99FF99', label='PUSCH'), mpatches.Patch(color='#00FFFF', label='DMRS'),
-          mpatches.Patch(color='#FF00FF', label='PTRS'), mpatches.Patch(color='#FF4500', label='PRACH'),
-          patches.Patch(edgecolor='red', facecolor='none', linestyle='--', linewidth=2, label='Active BWP')]
+# Cyberpunk Neon Colormap
+cyber_colors = [
+    '#0e1117', # 0: BG (Dark space)
+    '#00e5ff', # 1: PDCCH (Neon Cyan)
+    '#112240', # 2: PDSCH (Deep Navy)
+    '#1a1a1a', # 3: CSI-RS 
+    '#39ff14', # 4: PUCCH (Neon Green)
+    '#0a3619', # 5: PUSCH (Dark Forest Green)
+    '#1a1a1a', # 6: SRS
+    '#00ffff', # 7: DMRS DL (Bright Cyan)
+    '#ff007f', # 8: PTRS DL (Neon Pink)
+    '#ff4500', # 9: PRACH (Neon Orange)
+    '#adff2f', # 10: DMRS UL (Yellow-Green)
+    '#ff1493', # 11: PTRS UL (Deep Pink)
+    '#ff003c'  # 12: SSB (Neon Red)
+]
+cmap = mcolors.ListedColormap(cyber_colors)
+norm = mcolors.BoundaryNorm(np.arange(-0.5, 13.5, 1), cmap.N)
+
+legend = [
+    mpatches.Patch(color='#00e5ff', label='PDCCH'), mpatches.Patch(color='#112240', label='PDSCH'),
+    mpatches.Patch(color='#ff003c', label='SSB'), mpatches.Patch(color='#39ff14', label='PUCCH'), 
+    mpatches.Patch(color='#0a3619', label='PUSCH'), mpatches.Patch(color='#00ffff', label='DMRS'),
+    mpatches.Patch(color='#ff007f', label='PTRS'), mpatches.Patch(color='#ff4500', label='PRACH'),
+    patches.Patch(edgecolor='#ff003c', facecolor='none', linestyle='--', linewidth=2, label='Active BWP')
+]
 
 def plot_grid(g, ax, base_f, title, ylabel):
+    ax.set_facecolor('#0e1117') # 畫布底色
+    ax.grid(color='#2b2b2b', linestyle=':', linewidth=0.5) # 科技感輔助格線
+    
+    # 軸線發光效果
+    for spine in ax.spines.values():
+        spine.set_color('#00e5ff')
+        spine.set_linewidth(1.5)
+        
+    ax.xaxis.label.set_color('#00e5ff')
+    ax.yaxis.label.set_color('#00e5ff')
+    ax.tick_params(axis='x', colors='#00e5ff')
+    ax.tick_params(axis='y', colors='#00e5ff')
+    ax.title.set_color('#00e5ff')
+
     X, Y = np.meshgrid(np.linspace(0, total_ms, n_symbols+1), np.linspace(base_f, base_f+carrier_bw_mhz, n_sc+1))
     ax.pcolormesh(X, Y, g, cmap=cmap, norm=norm, edgecolors='none')
+    
+    # 霓虹紅 BWP 邊框
     bwp_min = base_f + bwp_s*12*(selected_scs/1000.0)
-    ax.add_patch(patches.Rectangle((0, bwp_min), total_ms, bwp_l*12*(selected_scs/1000.0), linewidth=2, edgecolor='red', facecolor='none', linestyle='--'))
-    ax.set_title(title); ax.set_ylabel(ylabel); ax.set_xlabel("Time (ms)")
+    ax.add_patch(patches.Rectangle((0, bwp_min), total_ms, bwp_l*12*(selected_scs/1000.0), linewidth=2.5, edgecolor='#ff003c', facecolor='none', linestyle='--'))
+    ax.set_title(title, pad=15, fontdict={'family': 'monospace', 'weight': 'bold'}); ax.set_ylabel(ylabel); ax.set_xlabel("Time (ms)")
 
 if duplex_mode == "TDD":
-    fig, ax = plt.subplots(figsize=(12, 5))
-    plot_grid(grid_tdd, ax, fc_dl_mhz-carrier_bw_mhz/2, f"TDD | Band {user_band.upper()} | {test_ch} Channel", "Freq (MHz)")
-    ax.legend(handles=legend, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    fig, ax = plt.subplots(figsize=(14, 6))
+    fig.patch.set_facecolor('#0e1117')
+    plot_grid(grid_tdd, ax, fc_dl_mhz-carrier_bw_mhz/2, f"> TDD GRID | BAND {user_band.upper()} | {test_ch.upper()} CH", "Freq (MHz)")
+    ax.legend(handles=legend, loc='center left', bbox_to_anchor=(1.02, 0.5), facecolor='#0e1117', edgecolor='#00e5ff', labelcolor='#00e5ff')
     st.pyplot(fig)
 elif duplex_mode == "SDL":
-    fig, ax = plt.subplots(figsize=(12, 5))
-    plot_grid(grid_dl, ax, fc_dl_mhz-carrier_bw_mhz/2, f"SDL | Band {user_band.upper()}", "DL Freq (MHz)")
-    ax.legend(handles=legend, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    fig, ax = plt.subplots(figsize=(14, 6))
+    fig.patch.set_facecolor('#0e1117')
+    plot_grid(grid_dl, ax, fc_dl_mhz-carrier_bw_mhz/2, f"> SDL GRID (DOWNLINK) | BAND {user_band.upper()}", "DL Freq (MHz)")
+    ax.legend(handles=legend, loc='center left', bbox_to_anchor=(1.02, 0.5), facecolor='#0e1117', edgecolor='#00e5ff', labelcolor='#00e5ff')
     st.pyplot(fig)
 elif duplex_mode == "SUL":
-    fig, ax = plt.subplots(figsize=(12, 5))
-    plot_grid(grid_ul, ax, fc_ul_mhz-carrier_bw_mhz/2, f"SUL | Band {user_band.upper()}", "UL Freq (MHz)")
-    ax.legend(handles=legend, loc='center left', bbox_to_anchor=(1.02, 0.5))
+    fig, ax = plt.subplots(figsize=(14, 6))
+    fig.patch.set_facecolor('#0e1117')
+    plot_grid(grid_ul, ax, fc_ul_mhz-carrier_bw_mhz/2, f"> SUL GRID (UPLINK) | BAND {user_band.upper()}", "UL Freq (MHz)")
+    ax.legend(handles=legend, loc='center left', bbox_to_anchor=(1.02, 0.5), facecolor='#0e1117', edgecolor='#00e5ff', labelcolor='#00e5ff')
     st.pyplot(fig)
 else:
-    fig, (ax_d, ax_u) = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
-    plot_grid(grid_dl, ax_d, fc_dl_mhz-carrier_bw_mhz/2, f"DL | Band {user_band.upper()}", "DL Freq (MHz)")
-    plot_grid(grid_ul, ax_u, fc_ul_mhz-carrier_bw_mhz/2, f"UL | Spacing: {spacing_mhz}MHz", "UL Freq (MHz)")
-    fig.legend(handles=legend, loc='center right', bbox_to_anchor=(1.12, 0.5))
+    fig, (ax_d, ax_u) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+    fig.patch.set_facecolor('#0e1117')
+    plot_grid(grid_dl, ax_d, fc_dl_mhz-carrier_bw_mhz/2, f"> DL GRID | BAND {user_band.upper()}", "DL Freq (MHz)")
+    plot_grid(grid_ul, ax_u, fc_ul_mhz-carrier_bw_mhz/2, f"> UL GRID | SPACING: {spacing_mhz}MHz", "UL Freq (MHz)")
+    fig.legend(handles=legend, loc='center right', bbox_to_anchor=(1.12, 0.5), facecolor='#0e1117', edgecolor='#00e5ff', labelcolor='#00e5ff')
     st.pyplot(fig)
-
-st.success(f"🚀 **Throughput Estimates**: DL: **{dl_mbps:.2f} Mbps** | UL: **{ul_mbps:.2f} Mbps**")
